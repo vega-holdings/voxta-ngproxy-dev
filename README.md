@@ -43,10 +43,13 @@ Install does:
 ## Files / Logs
 - Tools root: `Voxta.Server.Win.v1.2.0/Data/Tools/NGProxy/`
 - ACME data (accounts/certs/keys): `.../acme/` (back this up; it contains private keys)
+- Certificate files: `.../acme/certificates/{domain}.crt`, `{domain}.key`, `{domain}.issuer.crt` (if present), `{domain}.fullchain.crt`
 - nginx config: `.../nginx/.../conf/ngproxy.conf`
 - nginx logs: `.../nginx/.../logs/`
 
 ## Troubleshooting
 - “I filled the form and nothing happened”: go to Modules list and click **Install** for NGProxy.
-- `cloudflare: could not find zone for domain ...`: set `DNS Resolvers (optional)` to a working resolver (often your router DNS), and ensure the hostname is inside a Cloudflare zone covered by the token.
+- `cloudflare: could not find zone for domain ...`: set `DNS Resolvers (optional)` to a working resolver (often your router DNS). Some networks/VPNs block Google Public DNS which can break lego’s zone detection.
 - nginx won’t start: check if ports 80/443 are already in use and read nginx logs in the Tools folder.
+- `nginx: [emerg] unknown directive "﻿worker_processes"`: the config file was written with a UTF-8 BOM. Ensure the file is UTF-8 **without BOM** (fixed in newer builds of NGProxy).
+- `nginx: [error] invalid PID number "" in .../ngproxy.pid` on reload: nginx isn’t running yet; NGProxy will fall back to starting it.

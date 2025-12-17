@@ -25,6 +25,7 @@ public class ModuleConfigurationProvider(
         Email.Name,
         CloudflareApiToken.Name,
         UpstreamUrl.Name,
+        MaxUploadSizeMb.Name,
         DnsResolvers.Name,
     ];
 
@@ -74,6 +75,17 @@ public class ModuleConfigurationProvider(
         Advanced = true,
     };
 
+    public static readonly FormIntField MaxUploadSizeMb = new()
+    {
+        Name = "MaxUploadSizeMb",
+        Label = "Max Upload Size (MB)",
+        Text = "nginx `client_max_body_size` limit for uploads through the proxy (affects imports). Set to `0` for unlimited.",
+        DefaultValue = 1024,
+        Min = 0,
+        Max = 102400,
+        Advanced = true,
+    };
+
     public Task<FormField[]> GetModuleConfigurationFieldsAsync(
         IAuthenticationContext auth,
         ISettingsSource settings,
@@ -97,6 +109,7 @@ public class ModuleConfigurationProvider(
             Email,
             CloudflareApiToken,
             UpstreamUrl,
+            MaxUploadSizeMb,
             DnsResolvers
         );
     }

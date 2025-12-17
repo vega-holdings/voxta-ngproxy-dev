@@ -403,6 +403,7 @@ internal sealed class NgProxyManager(
         var domain = NormalizeDomain(settings.GetOptional(ModuleConfigurationProvider.Domain));
         var email = (settings.GetOptional(ModuleConfigurationProvider.Email) ?? string.Empty).Trim();
         var upstreamUrl = (settings.GetOptional(ModuleConfigurationProvider.UpstreamUrl) ?? string.Empty).Trim();
+        var maxUploadSizeMb = settings.GetOptional(ModuleConfigurationProvider.MaxUploadSizeMb) ?? 1024;
         var dnsResolversRaw = settings.HasValue(ModuleConfigurationProvider.DnsResolvers)
             ? string.Join('\n', settings.GetRequired(ModuleConfigurationProvider.DnsResolvers))
             : string.Empty;
@@ -434,13 +435,19 @@ internal sealed class NgProxyManager(
             return null;
         }
 
+        if (maxUploadSizeMb < 0)
+        {
+            error = "MaxUploadSizeMb must be >= 0.";
+            return null;
+        }
+
         if (string.IsNullOrWhiteSpace(token))
         {
             error = "CloudflareApiToken is required.";
             return null;
         }
 
-        return new NgProxyConfig(domain, email, upstreamUrl, dnsResolvers);
+        return new NgProxyConfig(domain, email, upstreamUrl, maxUploadSizeMb, dnsResolvers);
     }
 
     private static string NormalizeDomain(string? value)
@@ -626,7 +633,7 @@ internal sealed class NgProxyManager(
     private static string ComputeConfigHash(NgProxyConfig config)
     {
         var canonical =
-            $"v2|domain={config.Domain}|email={config.Email}|upstream={config.UpstreamUrl}|dns_resolvers={string.Join(",", config.DnsResolvers)}";
+            $"v3|domain={config.Domain}|email={config.Email}|upstream={config.UpstreamUrl}|max_upload_mb={config.MaxUploadSizeMb}|dns_resolvers={string.Join(",", config.DnsResolvers)}";
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical))).ToLowerInvariant();
     }
 
@@ -1004,6 +1011,7 @@ internal sealed class NgProxyManager(
 
         // Note: proxy_pass expects a URL, so we keep it as-is.
         var upstream = config.UpstreamUrl;
+        var maxBodySize = config.MaxUploadSizeMb <= 0 ? "0" : $"{config.MaxUploadSizeMb}m";
 
         return $$"""
         worker_processes  1;
@@ -1026,6 +1034,7 @@ internal sealed class NgProxyManager(
 
             sendfile        on;
             keepalive_timeout  65;
+            client_max_body_size {{maxBodySize}};
 
             map $http_upgrade $connection_upgrade {
                 default upgrade;
@@ -1056,6 +1065,7 @@ internal sealed class NgProxyManager(
                     proxy_set_header Connection $connection_upgrade;
                     proxy_read_timeout 3600s;
                     proxy_send_timeout 3600s;
+                    proxy_request_buffering off;
                     proxy_buffering off;
                 }
             }
@@ -1179,7 +1189,7 @@ internal sealed class NgProxyManager(
 
     private static string FormatArg(string arg) => arg.Contains(' ') ? $"\"{arg}\"" : arg;
 
-    private sealed record NgProxyConfig(string Domain, string Email, string UpstreamUrl, IReadOnlyList<string> DnsResolvers);
+    private sealed record NgProxyConfig(string Domain, string Email, string UpstreamUrl, int MaxUploadSizeMb, IReadOnlyList<string> DnsResolvers);
 
     public sealed record NgProxyEvaluation(
         bool ConfigValid,
